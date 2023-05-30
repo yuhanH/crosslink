@@ -74,6 +74,10 @@ def sample_negatives(chr_dict, bed_df, n_neg, seq_length):
     for chr_name, seq in chr_dict.items():
         print('Sampling negatives for {}'.format(chr_name))
         chr_mask = np.zeros(len(seq))
+        # Mask start and end margins
+        margin_size = 1000
+        chr_mask[:1000] = 1
+        chr_mask[-1000:] = 1
         # Get all peaks for this chromosome
         chr_bed_df = bed_df[bed_df['chr'] == chr_name]
         for i, row in chr_bed_df.iterrows():
@@ -88,6 +92,8 @@ def sample_negatives(chr_dict, bed_df, n_neg, seq_length):
             start = idx - seq_length // 2
             end = idx + seq_length // 2
             seq = chr_dict[chr_name][start:end]
+            # Verify seq
+            assert len(seq) > 1
             sampled_negatives.append([chr_name, start, end, seq, -1, '.', np.nan, np.nan, "255,0,0", 'no_sample'])
     # Remove extra negatives
     sampled_negatives = sampled_negatives[:n_neg]
