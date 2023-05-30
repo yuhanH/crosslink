@@ -113,7 +113,6 @@ def get_all_tf_names():
     emb_name = [emb.split('.')[0] for emb in embeddings]
     tf_name = [tf.split('.')[0] for tf in tfs]
     overlap = set(emb_name).intersection(set(tf_name))
-    #print(overlap)
     print('Overlapping TFs: ', len(overlap))
     return sorted(list(overlap))
 
