@@ -8,14 +8,24 @@ sys.path.append('/home/ubuntu/codebase/tf_binding/src/preprocessing/dna_seq/gen_
 
 class TFBindingDataset(Dataset):
 
-    def __init__(self, mode = 'train', transform=None):
+    def __init__(self, mode = 'train', split = 'random',transform=None):
         self.data_path = '/home/ubuntu/codebase/tf_binding/data/hg38/tf_seq_data'
         self.tf_names = self.get_all_tf_names()
         self.transform = transform
         self.tf_embeddings = self.get_tf_embeddings()
         self.data = self.load_data()
         self.mode = mode
-        self.data_idx = self.data_split(self.data, mode)
+        self.split = split
+        if split == 'random':
+            self.data_idx = self.data_split(self.data, mode)
+        elif split == 'chr':
+            self.data_idx = self.data_split_by_chr(self.data, mode)
+        elif split == 'tf_cluster':
+            self.data_idx = self.data_split_by_tf_cluster(self.data, mode)
+        elif split == 'tf_and_chr':
+            self.data_idx = self.data_split_by_tf_and_chr(self.data, mode)
+        else:
+            raise ValueError('Invalid split')
 
     def __len__(self):
         return len(self.data_idx)
@@ -62,6 +72,57 @@ class TFBindingDataset(Dataset):
             return test_idx
         else:
             raise ValueError('Invalid mode')
+
+    def data_split_by_chr(self, data, mode, val_chr=['chr4'], test_chr=['chr14']):
+        """return data index for train, val, test set split by chromosome"""
+        data_train = data[~data['chr'].isin(val_chr + test_chr)]
+        data_val = data[data['chr'].isin(val_chr)]
+        data_test = data[data['chr'].isin(test_chr)]
+        if mode == 'train':
+            return data_train.index.values
+        elif mode == 'val':
+            return data_val.index.values
+        elif mode == 'test':
+            return data_test.index.values
+        else:
+            raise ValueError('Invalid mode')
+        
+    def data_split_by_tf_cluster(self, data, mode, val_cluster=[8], test_cluster=[9]):
+        """return data index for train, val, test set split by TF cluster"""
+        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf_name'].values
+        val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf_name'].values
+        test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf_name'].values
+        data_train = data[data['tf_name'].isin(train_tfs)]
+        data_val = data[data['tf_name'].isin(val_tfs)]
+        data_test = data[data['tf_name'].isin(test_tfs)]
+        if mode == 'train':
+            return data_train.index.values
+        elif mode == 'val':
+            return data_val.index.values
+        elif mode == 'test':
+            return data_test.index.values
+        else:
+            raise ValueError('Invalid mode')
+    
+    def data_split_by_tf_and_chr(self, data, mode, val_chr=['chr4'], test_chr=['chr14'], val_cluster=[8], test_cluster=[9]):
+        """return data index for train, val, test set split by TF cluster"""
+        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf_name'].values
+        val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf_name'].values
+        test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf_name'].values
+        data_train = data[data['tf_name'].isin(train_tfs) & ~data['chr'].isin(val_chr + test_chr)]
+        data_val = data[data['tf_name'].isin(val_tfs) & data['chr'].isin(val_chr)]
+        data_test = data[data['tf_name'].isin(test_tfs) & data['chr'].isin(test_chr)]
+        if mode == 'train':
+            return data_train.index.values
+        elif mode == 'val':
+            return data_val.index.values
+        elif mode == 'test':
+            return data_test.index.values
+        else:
+            raise ValueError('Invalid mode')
+        
 
     def load_data(self):
         processed_data_path = f'{self.data_path}/tf_binding_data.bed'
