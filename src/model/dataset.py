@@ -123,6 +123,43 @@ class TFBindingDataset(Dataset):
         else:
             raise ValueError('Invalid mode')
         
+    def data_split_by_tf_cluster(self, data, mode, val_cluster=[8], test_cluster=[9]):
+        """return data index for train, val, test set split by TF cluster"""
+        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf_name'].values
+        val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf_name'].values
+        test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf_name'].values
+        data_train = data[data['tf_name'].isin(train_tfs)]
+        data_val = data[data['tf_name'].isin(val_tfs)]
+        data_test = data[data['tf_name'].isin(test_tfs)]
+        if mode == 'train':
+            return data_train.index.values
+        elif mode == 'val':
+            return data_val.index.values
+        elif mode == 'test':
+            return data_test.index.values
+        else:
+            raise ValueError('Invalid mode')
+    
+    def data_split_by_tf(self, data, mode, val_num=1, test_num=1):
+        """return data index for train, val, test set split by tf_name. Leave 1 TFs in each TF cluster for validation and same for test set, respectively"""
+        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        # first tf in each cluster is used for validation, last tf in each cluster is used for test
+        val_tfs = tf_cluster.groupby('cluster').head(val_num)['tf_name'].values
+        test_tfs = tf_cluster.groupby('cluster').tail(test_num)['tf_name'].values
+        train_tfs = tf_cluster[~tf_cluster['tf_name'].isin(val_tfs + test_tfs)]['tf_name'].values
+        data_train = data[data['tf_name'].isin(train_tfs)]
+        data_val = data[data['tf_name'].isin(val_tfs)]
+        data_test = data[data['tf_name'].isin(test_tfs)]
+        if mode == 'train':
+            return data_train.index.values
+        elif mode == 'val':
+            return data_val.index.values
+        elif mode == 'test':
+            return data_test.index.values
+        else:
+            raise ValueError('Invalid mode')
+        
 
     def load_data(self):
         processed_data_path = f'{self.data_path}/tf_binding_data.bed'
