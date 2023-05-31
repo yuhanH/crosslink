@@ -92,9 +92,9 @@ class TFBindingDataset(Dataset):
     def data_split_by_tf_and_chr(self, data, mode, val_chr=['chr4'], test_chr=['chr14'], val_cluster=[8], test_cluster=[9]):
         """return data index for train, val, test set split by TF cluster"""
         tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
-        train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf_name'].values
-        val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf_name'].values
-        test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf_name'].values
+        train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf'].values
+        val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf'].values
+        test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf'].values
         data_train = data[data['tf_name'].isin(train_tfs) & ~data['chr'].isin(val_chr + test_chr)]
         data_val = data[data['tf_name'].isin(val_tfs) & data['chr'].isin(val_chr)]
         data_test = data[data['tf_name'].isin(test_tfs) & data['chr'].isin(test_chr)]
@@ -110,9 +110,9 @@ class TFBindingDataset(Dataset):
     def data_split_by_tf_cluster(self, data, mode, val_cluster=[8], test_cluster=[9]):
         """return data index for train, val, test set split by TF cluster"""
         tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
-        train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf_name'].values
-        val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf_name'].values
-        test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf_name'].values
+        train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf'].values
+        val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf'].values
+        test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf'].values
         data_train = data[data['tf_name'].isin(train_tfs)]
         data_val = data[data['tf_name'].isin(val_tfs)]
         data_test = data[data['tf_name'].isin(test_tfs)]
@@ -129,9 +129,9 @@ class TFBindingDataset(Dataset):
         """return data index for train, val, test set split by tf_name. Leave 1 TFs in each TF cluster for validation and same for test set, respectively"""
         tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
         # first tf in each cluster is used for validation, last tf in each cluster is used for test
-        val_tfs = tf_cluster.groupby('cluster').head(val_num)['tf_name'].values
-        test_tfs = tf_cluster.groupby('cluster').tail(test_num)['tf_name'].values
-        train_tfs = tf_cluster[~tf_cluster['tf_name'].isin(val_tfs + test_tfs)]['tf_name'].values
+        val_tfs = tf_cluster.groupby('cluster').head(val_num)['tf'].values
+        test_tfs = tf_cluster.groupby('cluster').tail(test_num)['tf'].values
+        train_tfs = tf_cluster[~tf_cluster['tf'].isin(val_tfs + test_tfs)]['tf'].values
         data_train = data[data['tf_name'].isin(train_tfs)]
         data_val = data[data['tf_name'].isin(val_tfs)]
         data_test = data[data['tf_name'].isin(test_tfs)]
