@@ -17,6 +17,10 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--split', type=str, default='tf_in_domain', choices=['random', 'chr', 'tf_cluster', 'tf_and_chr', 'tf_in_domain'])
+    parser.add_argument('--run_dir', type=str, default='/home/ubuntu/codebase/tf_binding/runs/')
+    parser.add_argument('--epoches', type=int, default=200)
+    parser.add_argument("--batch_size", type=int, default=128)
     args = parser.parse_args()
 
     # Initialize distributed training
@@ -29,12 +33,12 @@ def main():
     run_id = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
     # Load data and model
-    train_dataset = TFBindingDataset(mode='train', split='tf_in_domain')
+    train_dataset = TFBindingDataset(mode='train', split=args.split)
     train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
-    train_loader = DataLoader(train_dataset, batch_size=128, sampler=train_sampler, num_workers=30)
-    val_dataset = TFBindingDataset(mode='val', split='tf_in_domain')
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=train_sampler, num_workers=30)
+    val_dataset = TFBindingDataset(mode='val', split=args.split)
     val_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank)
-    val_loader = DataLoader(val_dataset, batch_size=128, sampler=val_sampler, num_workers=10)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, sampler=val_sampler, num_workers=10)
     model = TFBindingModel().cuda()
     model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank)
     criterion = nn.MSELoss()
@@ -48,7 +52,7 @@ def main():
     lowest_val_loss = float('inf')
 
     # Train model
-    for epoch in range(200):
+    for epoch in range(args.epoches):
         # Train loop
         model.train()
         train_loss = 0
@@ -88,7 +92,7 @@ def main():
         print(f'Epoch {epoch}, train loss {train_loss_list[-1]}, val loss {val_loss_list[-1]}, pearsonr {pearsonr_val}, spearmanr {spearmanr_val}')
 
         # Save model
-        save_path = f'/home/ubuntu/codebase/tf_binding/runs/{run_id}'
+        save_path = f'{args.run_dir}{run_id}'
         if val_loss_list[-1] < lowest_val_loss:
             lowest_val_loss = val_loss_list[-1]
             os.makedirs(f'{save_path}/models', exist_ok=True)
