@@ -17,7 +17,7 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--local_rank', type=int, default=0)
-    parser.add_argument('--split', type=str, default='tf_in_domain', choices=['random', 'chr', 'tf_cluster', 'tf_and_chr', 'tf_in_domain'])
+    parser.add_argument('--split', type=str, default='tf_in_domain', choices=['random', 'chr', 'tf_cluster', 'tf_and_chr', 'tf_in_domain', 'tf_in_domain_and_chr'])
     parser.add_argument('--run_dir', type=str, default='/home/ubuntu/codebase/tf_binding/runs/')
     parser.add_argument('--epoches', type=int, default=200)
     parser.add_argument("--batch_size", type=int, default=128)

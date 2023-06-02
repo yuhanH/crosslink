@@ -9,7 +9,7 @@ sys.path.append('/home/ubuntu/codebase/tf_binding/src/preprocessing/dna_seq/gen_
 class TFBindingDataset(Dataset):
 
     def __init__(self, mode = 'train', split = 'random',transform=None):
-        self.data_path = '/home/ubuntu/codebase/tf_binding/data/hg38/tf_seq_data'
+        self.data_path = '/home/ubuntu/codebase/tf_binding/data/hg38/tf_seq_data_all_tf_200bp/'
         self.tf_names = self.get_all_tf_names()
         self.transform = transform
         self.tf_embeddings = self.get_tf_embeddings()
@@ -26,6 +26,8 @@ class TFBindingDataset(Dataset):
             self.data_idx = self.data_split_by_tf_and_chr(self.data, mode)
         elif split == 'tf_in_domain':
             self.data_idx = self.data_split_by_tf_in_domain(self.data, mode)
+        elif split == 'tf_in_domain_and_chr':
+            self.data_idx = self.data_split_by_tf_in_domain_and_chr(self.data, mode)
         else:
             raise ValueError('Invalid split')
 
@@ -42,7 +44,7 @@ class TFBindingDataset(Dataset):
         return onehot_seq, tf_embedding, label
 
     def get_tf_embeddings(self):
-        tf_embedding_path = '/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B'
+        tf_embedding_path = '/home/ubuntu/protein_embeddings/all_tf_emb_esm2_t36_3B'
         model_id = 36
         tf_embeddings = {}
         for tf_name in self.tf_names:
@@ -52,7 +54,7 @@ class TFBindingDataset(Dataset):
             pad_margin_r = 300 - embedding.shape[1] - pad_margin_l
             padded_embedding = torch.nn.functional.pad(embedding, (pad_margin_l, pad_margin_r), 'constant', 0)
             # Crop
-            cropped_embedding = padded_embedding[:, 100:200]
+            cropped_embedding = padded_embedding[:, 50:150]
             tf_embeddings[tf_name] = cropped_embedding
         return tf_embeddings
 
@@ -144,6 +146,27 @@ class TFBindingDataset(Dataset):
         else:
             raise ValueError('Invalid mode')
         
+    def data_split_by_tf_in_domain_and_chr(self, data, mode, val_num=1, test_num=1, val_chr=['chr4'], test_chr=['chr14']):
+        """return data index for train, val, test set split by tf_name. Leave 1 TFs in each TF cluster for validation and same for test set, respectively"""
+        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        # first tf in each cluster is used for validation, last tf in each cluster is used for test
+        val_tfs = tf_cluster.groupby('cluster').head(val_num)['tf'].values
+        test_tfs = tf_cluster.groupby('cluster').tail(test_num)['tf'].values
+        train_tfs = tf_cluster[~tf_cluster['tf'].isin(val_tfs + test_tfs)]['tf'].values
+        non_train_chrs = val_chr + test_chr
+        data_train = data[data['tf_name'].isin(train_tfs)].query('chr not in @non_train_chrs')
+        data_val = data[data['tf_name'].isin(val_tfs)].query('chr in @val_chr')
+        data_test = data[data['tf_name'].isin(test_tfs)].query('chr in @test_chr')
+        if mode == 'train':
+            return data_train.index.values
+        elif mode == 'val':
+            return data_val.index.values
+        elif mode == 'test':
+            return data_test.index.values
+        else:
+            raise ValueError('Invalid mode')
+        
+
 
     def load_data(self):
         processed_data_path = f'{self.data_path}/tf_binding_data.bed'
