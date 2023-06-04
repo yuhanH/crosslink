@@ -8,6 +8,7 @@ import sys
 sys.path.append('../model')
 from model import TFBindingModel
 from dataset import TFBindingDataset
+
 data_dir = '/home/ubuntu/demo_session/demo_data/'
 model_path = '/home/ubuntu/demo_session/demo_data/model_9.pt'
 
@@ -236,6 +237,19 @@ dataset = TFBindingDataset()
 demo = gr.Blocks()
 
 with demo:
+    gr.Markdown(
+    """
+    # Introduction
+    Crosslink is a deep learning tool designed to predict binding events based on nucleic acid sequences (DNA/RNA) and protein structure. This model enables identifying potential changes in binding sites due to specific protein mutations. Crosslink operates by utilizing separate encoders for protein and nucleic acid sequences which are subsequently fused via an attention network to predict binding occurrences. This computation ChIP-seq/eCLIP-seq tool offers a unique approach to understanding protein - DNA/RNA interactions and their potential alterations. For further details, please visit our [GitHub repository](https://github.com/crosslink-bioml/crosslink).
+    """)
+    gr.Markdown(
+    """
+    # Data input
+    ## Protein
+   In the below sections, you can enter the amino acid sequences for both wild type and mutant proteins. Our default example features the wild type TP53, a tumor suppressor protein, alongside its most common mutation, R248Q. However, you are welcome to input your own protein sequences to cater the analysis to your specific needs.
+
+    """)
+ 
     amino_acid_text = gr.Textbox(label = 'Amino Acid Sequence', lines = 5, placeholder = 'GRGRHPGKGVK...')
     gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRK', # TP53
                 'GRGRHPGKGVKSPGEKSRYETSLNLTTKRFLELLSHSADGVVDLNWAAEVLKVQKRRIYDITNVLEGIQLIAKKSKNHIQWLGS'], inputs=amino_acid_text)
@@ -245,12 +259,20 @@ with demo:
                  'TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVKVCACPGRDRRTEEENLRK', # TP53 Mut R273K
                  ], inputs=amino_acid_mut_text)
 
-    dna_seq_text = gr.Textbox(label = 'DNA Sequence', lines = 5, placeholder = 'gcaggggggcactc...')
-    gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
-
     gr.Markdown(
     """
-    ESM embedding of the amino acid sequence with our pretrained proteins
+    # Data input
+    ## DNA/RNA
+   In the below sections, you can also input your own sequences to cater the analysis to your specific needs in the FASTA format.  The default DNA input sequences are some cell cycle related genes (such as MDM2, BAX2). 
+    """)
+
+    dna_seq_text = gr.Textbox(label = 'DNA Sequence', lines = 5, placeholder = 'gcaggggggcactc...')
+    gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
+    
+    gr.Markdown(
+    """
+    ## ESM2 visualization of your input proteins and our pretrained proteins
+  In the following section, you can visualize the ESM2 embeddings derived from the esm2_t36_3B_UR50D model for both your input proteins and our pre-trained proteins. Each protein is represented in 2560 dimensions. We have applied pyMDE to generate two-dimensional visualization of these embeddings. If you find that your proteins significantly differ from our pre-trained protein set, the accuracy of the prediction might be compromised. This discrepancy could occur due to deviations outside the trained protein distribution.
     """)
     aa_plot = gr.Plot()
     tf_embedding_target = gr.State([])
@@ -261,19 +283,32 @@ with demo:
     onehot_seq = gr.State([])
     tf_embedding = gr.State([])
     mut_tf_embedding = gr.State([])
-
+    gr.Markdown(
+    """
+    # Crosslink Prediction
+    ## Binding affinity prediction
+    """)
     button = gr.Button('Predict')
     button.click(predict, inputs = [amino_acid_text, dna_seq_text], outputs = [output, onehot_seq, tf_embedding])
 
     mutation_label = gr.Label(label = 'Mutation Sequence Processed')
     button = gr.Button('Process Mutation')
     button.click(amino_acid_mut_encode, inputs = [amino_acid_mut_text], outputs = [mut_tf_embedding, mutation_label])
-
+gr.Markdown(
+    """
+    ## Comparison with other TFs binding affinity
+    """)
     tf_comparison_plot = gr.Plot()
     botton = gr.Button('Compare with other TFs')
     botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = [tf_comparison_plot])
-
-    # mdm2
+    gr.Markdown(
+    """
+    ## Promoter binding difference between wild type and mutant of protein
+    """)
+    gr.Markdown(
+    """
+    # MDM2 promoter 
+    """)
     mdm2_plot = gr.Plot()
     mdm2_button = gr.Button('Generate binding profile for MDM2 promoter')
     mdm2_button.click(validate_local_region_mdm2, inputs = [tf_embedding], outputs = mdm2_plot)
@@ -283,8 +318,10 @@ with demo:
     mdm2_plot_diff = gr.Plot()
     mdm2_mut_button = gr.Button('Compare mutated on MDM2 promoter region')
     mdm2_mut_button.click(compare_wt_mut_tf_mdm2, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
-
-    # bax
+    gr.Markdown(
+    """
+    # BAX promoter 
+    """)
     bax_plot = gr.Plot()
     bax_button = gr.Button('Generate binding profile for BAX promoter')
     bax_button.click(validate_local_region_bax, inputs = [tf_embedding], outputs = bax_plot)
@@ -295,7 +332,12 @@ with demo:
     bax_mut_button = gr.Button('Compare mutated on BAX promoter region')
     bax_mut_button.click(compare_wt_mut_tf_bax, inputs = [tf_embedding, mut_tf_embedding], outputs = [bax_plot_wt, bax_plot_mut, bax_plot_diff])
 
-    # KMT2A
+
+    gr.Markdown(
+    """
+    # KMT2A promoter
+   KMT2A is a gene that encodes a histone methyltransferase. KMT2A is most notorious for its role in acute leukemia. Mutations and changes in its expression have also been found in solid tumors, such as lung, colorectal, and gastric cancers.
+    """)
     kmt2a_plot = gr.Plot()
     kmt2a_button = gr.Button('Generate binding profile for KMT2A promoter')
     kmt2a_button.click(validate_local_region_kmt2a, inputs = [tf_embedding], outputs = kmt2a_plot)
