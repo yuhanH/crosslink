@@ -5,6 +5,7 @@ import esm
 import json
 import torch
 import sys
+
 sys.path.append('../model')
 from model import TFBindingModel
 from dataset import TFBindingDataset
@@ -242,6 +243,7 @@ def change_model(choice = "DNA"):
 
 
 # Analysis
+ 
 
 esm_model, batch_converter, alphabet = load_esm_model()
 model = None
@@ -255,6 +257,11 @@ with demo:
     # Introduction
     Crosslink is a deep learning tool designed to predict binding events based on nucleic acid sequences (DNA/RNA) and protein structure. This model enables identifying potential changes in binding sites due to specific protein mutations. Crosslink operates by utilizing separate encoders for protein and nucleic acid sequences which are subsequently fused via an attention network to predict binding occurrences. This computation ChIP-seq/eCLIP-seq tool offers a unique approach to understanding protein - DNA/RNA interactions and their potential alterations. For further details, please visit our [GitHub repository](https://github.com/crosslink-bioml/crosslink).
     """)
+        gr.Markdown(
+    """
+    ![image](https://github.com/crosslink-bioml/crosslink/blob/main/data/schema_crosslink.png)
+    """)    
+        
     with gr.Tab("Analysis"):
 
         gr.Markdown(
