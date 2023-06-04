@@ -11,7 +11,7 @@ from dataset import TFBindingDataset
 torch.cuda.empty_cache()
 
 data_dir = '/home/ubuntu/demo_session/demo_data/'
-model_path = '/home/ubuntu/demo_session/demo_data/model_9.pt'
+model_path = {"DNA":'/home/ubuntu/demo_session/demo_data/model_9.pt', "RNA":'/home/ubuntu/demo_session/demo_data/rbp_model_10.pt'}
 
 # Load models
 def load_esm_model():
@@ -22,10 +22,10 @@ def load_esm_model():
     print('Done.')
     return esm_model, batch_converter, alphabet
 
-def load_model(model_path = model_path):
-    print('Loading TF Binding model...')
+def load_model(mode = 'DNA'):
+    print(f'Loading {mode} Binding model...')
     model = TFBindingModel()
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path[mode]))
     model.eval()
     model.cuda()
     print('Done.')
@@ -98,7 +98,10 @@ def esm_visulization(amino_acid_seq):
 
   
 # Prediction
-def predict(amino_acid_seq, dna_seq):
+def predict(amino_acid_seq, dna_seq, mode = 'DNA'):
+    global model
+    if model is None:
+        model = load_model(mode)
     tf_embedding = amino_acid_encode(amino_acid_seq)
     #torch.save(tf_embedding, 'tf_embedding.pt')
     #tf_embedding = torch.load('tf_embedding.pt')
@@ -231,17 +234,18 @@ def validate_local_region_kmt2a(tf_embedding):
     return validate_local_region(chr_name, start, end, radius, tf_embedding)[0]
 
 def change_model(choice = "DNA"):
+    model = load_model(choice)
     if choice == "RNA":
-        return gr.update(lines=5, visible=True, label="RNA input sequences: ", placeholder = 'ccggatggtgcact...')
+        return gr.update(lines=5, visible=True, label="RNA input sequences: ", placeholder = 'ccggatggtgcact...'), choice
     else:
-        return gr.update(lines=5, visible=True, label="DNA input sequences: ", placeholder = 'gcaggggggcactc...')
+        return gr.update(lines=5, visible=True, label="DNA input sequences: ", placeholder = 'gcaggggggcactc...'), choice
 
 
 
 # Analysis
 
 esm_model, batch_converter, alphabet = load_esm_model()
-model = load_model()
+model = None
 dataset = TFBindingDataset()
 demo = gr.Blocks()
 
@@ -280,9 +284,10 @@ with demo:
     )
 
     dna_seq_text = gr.Textbox(lines=2, interactive=True)
-    CHOICE.change(fn=change_model, inputs=CHOICE, outputs=dna_seq_text)
+    model_choice = gr.State([])
+    CHOICE.change(fn=change_model, inputs=CHOICE, outputs=[dna_seq_text,model_choice])
     gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
-    
+ 
 
     gr.Markdown(
     """
@@ -293,76 +298,78 @@ with demo:
     tf_embedding_target = gr.State([])
     button = gr.Button('Visualize Amino Acid Embedding')
     button.click(esm_visulization, inputs = [amino_acid_text], outputs = [aa_plot, tf_embedding_target])
-
-    output = gr.Label(label = 'Binding Affinity Prediction, log (x + 1) scaled')
-    onehot_seq = gr.State([])
-    tf_embedding = gr.State([])
-    mut_tf_embedding = gr.State([])
     gr.Markdown(
     """
     # Crosslink Prediction
     ## Binding affinity prediction
     """)
+    output = gr.Label(label = 'Binding Affinity Prediction, log (x + 1) scaled')
+    onehot_seq = gr.State([])
+    tf_embedding = gr.State([])
+    mut_tf_embedding = gr.State([])
+ 
     button = gr.Button('Predict')
-    button.click(predict, inputs = [amino_acid_text, dna_seq_text], outputs = [output, onehot_seq, tf_embedding])
+    button.click(predict, inputs = [amino_acid_text, dna_seq_text, model_choice], outputs = [output, onehot_seq, tf_embedding])
 
     mutation_label = gr.Label(label = 'Mutation Sequence Processed')
     button = gr.Button('Process Mutation')
     button.click(amino_acid_mut_encode, inputs = [amino_acid_mut_text], outputs = [mut_tf_embedding, mutation_label])
-    gr.Markdown(
-    """
-    ## Comparison with other TFs binding affinity
-    """)
-    tf_comparison_plot = gr.Plot()
-    botton = gr.Button('Compare with other TFs')
-    botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = [tf_comparison_plot])
-    gr.Markdown(
-    """
-    ## Promoter binding difference between wild type and mutant of protein
-    """)
-    gr.Markdown(
-    """
-    # MDM2 promoter 
-    """)
-    mdm2_plot = gr.Plot()
-    mdm2_button = gr.Button('Generate binding profile for MDM2 promoter')
-    mdm2_button.click(validate_local_region_mdm2, inputs = [tf_embedding], outputs = mdm2_plot)
+    if model_choice == 'DNA':
+  
+        gr.Markdown(
+        """
+        ## Comparison with other TFs binding affinity
+        """)
+        tf_comparison_plot = gr.Plot()
+        botton = gr.Button('Compare with other TFs')
+        botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = [tf_comparison_plot])
+        gr.Markdown(
+        """
+        ## Promoter binding difference between wild type and mutant of protein
+        """)
+        gr.Markdown(
+        """
+        # MDM2 promoter 
+        """)
+        mdm2_plot = gr.Plot()
+        mdm2_button = gr.Button('Generate binding profile for MDM2 promoter')
+        mdm2_button.click(validate_local_region_mdm2, inputs = [tf_embedding], outputs = mdm2_plot)
 
-    mdm2_plot_wt = gr.Plot()
-    mdm2_plot_mut = gr.Plot()
-    mdm2_plot_diff = gr.Plot()
-    mdm2_mut_button = gr.Button('Compare mutated on MDM2 promoter region')
-    mdm2_mut_button.click(compare_wt_mut_tf_mdm2, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
-    gr.Markdown(
-    """
-    # BAX promoter 
-    """)
-    bax_plot = gr.Plot()
-    bax_button = gr.Button('Generate binding profile for BAX promoter')
-    bax_button.click(validate_local_region_bax, inputs = [tf_embedding], outputs = bax_plot)
+        mdm2_plot_wt = gr.Plot()
+        mdm2_plot_mut = gr.Plot()
+        mdm2_plot_diff = gr.Plot()
+        mdm2_mut_button = gr.Button('Compare mutated on MDM2 promoter region')
+        mdm2_mut_button.click(compare_wt_mut_tf_mdm2, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
+        gr.Markdown(
+        """
+        # BAX promoter 
+        """)
+        bax_plot = gr.Plot()
+        bax_button = gr.Button('Generate binding profile for BAX promoter')
+        bax_button.click(validate_local_region_bax, inputs = [tf_embedding], outputs = bax_plot)
 
-    bax_plot_wt = gr.Plot()
-    bax_plot_mut = gr.Plot()
-    bax_plot_diff = gr.Plot()
-    bax_mut_button = gr.Button('Compare mutated on BAX promoter region')
-    bax_mut_button.click(compare_wt_mut_tf_bax, inputs = [tf_embedding, mut_tf_embedding], outputs = [bax_plot_wt, bax_plot_mut, bax_plot_diff])
+        bax_plot_wt = gr.Plot()
+        bax_plot_mut = gr.Plot()
+        bax_plot_diff = gr.Plot()
+        bax_mut_button = gr.Button('Compare mutated on BAX promoter region')
+        bax_mut_button.click(compare_wt_mut_tf_bax, inputs = [tf_embedding, mut_tf_embedding], outputs = [bax_plot_wt, bax_plot_mut, bax_plot_diff])
 
 
-    gr.Markdown(
-    """
-    # KMT2A promoter
-   KMT2A is a gene that encodes a histone methyltransferase. KMT2A is most notorious for its role in acute leukemia. Mutations and changes in its expression have also been found in solid tumors, such as lung, colorectal, and gastric cancers.
-    """)
-    kmt2a_plot = gr.Plot()
-    kmt2a_button = gr.Button('Generate binding profile for KMT2A promoter')
-    kmt2a_button.click(validate_local_region_kmt2a, inputs = [tf_embedding], outputs = kmt2a_plot)
+        gr.Markdown(
+        """
+        # KMT2A promoter
+    KMT2A is a gene that encodes a histone methyltransferase. KMT2A is most notorious for its role in acute leukemia. Mutations and changes in its expression have also been found in solid tumors, such as lung, colorectal, and gastric cancers.
+        """)
+        kmt2a_plot = gr.Plot()
+        kmt2a_button = gr.Button('Generate binding profile for KMT2A promoter')
+        kmt2a_button.click(validate_local_region_kmt2a, inputs = [tf_embedding], outputs = kmt2a_plot)
 
-    kmt2a_plot_wt = gr.Plot()
-    kmt2a_plot_mut = gr.Plot()
-    kmt2a_plot_diff = gr.Plot()
-    kmt2a_mut_button = gr.Button('Compare mutated on KMT2A promoter region')
-    kmt2a_mut_button.click(compare_wt_mut_tf_kmt2a, inputs = [tf_embedding, mut_tf_embedding], outputs = [kmt2a_plot_wt, kmt2a_plot_mut, kmt2a_plot_diff])
+        kmt2a_plot_wt = gr.Plot()
+        kmt2a_plot_mut = gr.Plot()
+        kmt2a_plot_diff = gr.Plot()
+        kmt2a_mut_button = gr.Button('Compare mutated on KMT2A promoter region')
+        kmt2a_mut_button.click(compare_wt_mut_tf_kmt2a, inputs = [tf_embedding, mut_tf_embedding], outputs = [kmt2a_plot_wt, kmt2a_plot_mut, kmt2a_plot_diff])
 
-    #gr.Image(label = 'Relationship in Disease State')
+        #gr.Image(label = 'Relationship in Disease State')
 
 demo.launch(share=True)  
