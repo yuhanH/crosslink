@@ -100,8 +100,7 @@ def esm_visulization(amino_acid_seq):
 # Prediction
 def predict(amino_acid_seq, dna_seq, mode = 'DNA'):
     global model
-    if model is None:
-        model = load_model(mode)
+    model = load_model(mode)
     tf_embedding = amino_acid_encode(amino_acid_seq)
     #torch.save(tf_embedding, 'tf_embedding.pt')
     #tf_embedding = torch.load('tf_embedding.pt')
@@ -314,62 +313,61 @@ with demo:
     mutation_label = gr.Label(label = 'Mutation Sequence Processed')
     button = gr.Button('Process Mutation')
     button.click(amino_acid_mut_encode, inputs = [amino_acid_mut_text], outputs = [mut_tf_embedding, mutation_label])
-    if model_choice == 'DNA':
-  
-        gr.Markdown(
-        """
-        ## Comparison with other TFs binding affinity
-        """)
-        tf_comparison_plot = gr.Plot()
-        botton = gr.Button('Compare with other TFs')
-        botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = [tf_comparison_plot])
-        gr.Markdown(
-        """
-        ## Promoter binding difference between wild type and mutant of protein
-        """)
-        gr.Markdown(
-        """
-        # MDM2 promoter 
-        """)
-        mdm2_plot = gr.Plot()
-        mdm2_button = gr.Button('Generate binding profile for MDM2 promoter')
-        mdm2_button.click(validate_local_region_mdm2, inputs = [tf_embedding], outputs = mdm2_plot)
 
-        mdm2_plot_wt = gr.Plot()
-        mdm2_plot_mut = gr.Plot()
-        mdm2_plot_diff = gr.Plot()
-        mdm2_mut_button = gr.Button('Compare mutated on MDM2 promoter region')
-        mdm2_mut_button.click(compare_wt_mut_tf_mdm2, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
-        gr.Markdown(
-        """
-        # BAX promoter 
-        """)
-        bax_plot = gr.Plot()
-        bax_button = gr.Button('Generate binding profile for BAX promoter')
-        bax_button.click(validate_local_region_bax, inputs = [tf_embedding], outputs = bax_plot)
+    gr.Markdown(
+    """
+    ## Comparison with other TFs binding affinity
+    """)
+    tf_comparison_plot = gr.Plot()
+    botton = gr.Button('Compare with other TFs')
+    botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = [tf_comparison_plot])
+    gr.Markdown(
+    """
+    ## Promoter binding difference between wild type and mutant of protein
+    """)
+    gr.Markdown(
+    """
+    # MDM2 promoter 
+    """)
+    mdm2_plot = gr.Plot()
+    mdm2_button = gr.Button('Generate binding profile for MDM2 promoter')
+    mdm2_button.click(validate_local_region_mdm2, inputs = [tf_embedding], outputs = mdm2_plot)
 
-        bax_plot_wt = gr.Plot()
-        bax_plot_mut = gr.Plot()
-        bax_plot_diff = gr.Plot()
-        bax_mut_button = gr.Button('Compare mutated on BAX promoter region')
-        bax_mut_button.click(compare_wt_mut_tf_bax, inputs = [tf_embedding, mut_tf_embedding], outputs = [bax_plot_wt, bax_plot_mut, bax_plot_diff])
+    mdm2_plot_wt = gr.Plot()
+    mdm2_plot_mut = gr.Plot()
+    mdm2_plot_diff = gr.Plot()
+    mdm2_mut_button = gr.Button('Compare mutated on MDM2 promoter region')
+    mdm2_mut_button.click(compare_wt_mut_tf_mdm2, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
+    gr.Markdown(
+    """
+    # BAX promoter 
+    """)
+    bax_plot = gr.Plot()
+    bax_button = gr.Button('Generate binding profile for BAX promoter')
+    bax_button.click(validate_local_region_bax, inputs = [tf_embedding], outputs = bax_plot)
+
+    bax_plot_wt = gr.Plot()
+    bax_plot_mut = gr.Plot()
+    bax_plot_diff = gr.Plot()
+    bax_mut_button = gr.Button('Compare mutated on BAX promoter region')
+    bax_mut_button.click(compare_wt_mut_tf_bax, inputs = [tf_embedding, mut_tf_embedding], outputs = [bax_plot_wt, bax_plot_mut, bax_plot_diff])
 
 
-        gr.Markdown(
-        """
-        # KMT2A promoter
-    KMT2A is a gene that encodes a histone methyltransferase. KMT2A is most notorious for its role in acute leukemia. Mutations and changes in its expression have also been found in solid tumors, such as lung, colorectal, and gastric cancers.
-        """)
-        kmt2a_plot = gr.Plot()
-        kmt2a_button = gr.Button('Generate binding profile for KMT2A promoter')
-        kmt2a_button.click(validate_local_region_kmt2a, inputs = [tf_embedding], outputs = kmt2a_plot)
+    gr.Markdown(
+    """
+    # KMT2A promoter
+KMT2A is a gene that encodes a histone methyltransferase. KMT2A is most notorious for its role in acute leukemia. Mutations and changes in its expression have also been found in solid tumors, such as lung, colorectal, and gastric cancers.
+    """)
+    kmt2a_plot = gr.Plot()
+    kmt2a_button = gr.Button('Generate binding profile for KMT2A promoter')
+    kmt2a_button.click(validate_local_region_kmt2a, inputs = [tf_embedding], outputs = kmt2a_plot)
 
-        kmt2a_plot_wt = gr.Plot()
-        kmt2a_plot_mut = gr.Plot()
-        kmt2a_plot_diff = gr.Plot()
-        kmt2a_mut_button = gr.Button('Compare mutated on KMT2A promoter region')
-        kmt2a_mut_button.click(compare_wt_mut_tf_kmt2a, inputs = [tf_embedding, mut_tf_embedding], outputs = [kmt2a_plot_wt, kmt2a_plot_mut, kmt2a_plot_diff])
+    kmt2a_plot_wt = gr.Plot()
+    kmt2a_plot_mut = gr.Plot()
+    kmt2a_plot_diff = gr.Plot()
+    kmt2a_mut_button = gr.Button('Compare mutated on KMT2A promoter region')
+    kmt2a_mut_button.click(compare_wt_mut_tf_kmt2a, inputs = [tf_embedding, mut_tf_embedding], outputs = [kmt2a_plot_wt, kmt2a_plot_mut, kmt2a_plot_diff])
 
-        #gr.Image(label = 'Relationship in Disease State')
+    #gr.Image(label = 'Relationship in Disease State')
 
 demo.launch(share=True)  
