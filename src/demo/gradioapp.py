@@ -175,6 +175,16 @@ def compare_wt_mut_tf(chr_name, start, end, radius, wt_tf, mut_tf):
     #fig_diff.update_yaxes(range=[-1, 1])
     return fig_wt, fig_mut, fig_diff
 
+def compare_wt_mut_tf_cdkn1a(wt_tf, mut_tf):
+    # CDKN1A
+    chr_name= 'chr6'
+    tss = 36676460 
+    radius = 1000
+    start = tss - radius
+    end = tss + radius
+    return compare_wt_mut_tf(chr_name, start, end, radius, wt_tf, mut_tf)
+
+
 def compare_wt_mut_tf_mdm2(wt_tf, mut_tf):
     # MDM2
     chr_name= 'chr12'
@@ -218,6 +228,17 @@ def validate_local_region(chr_name, start, end, radius, tf_embedding, tf_type = 
     fig.update_layout(title_text=f'TF Binding Prediction ({tf_type})', xaxis_title='Position to Promoter (bp)', yaxis_title='Predicted Binding, log (x + 1) scaled')
     fig.update_yaxes(range=[0, 7])
     return fig, pred_list
+
+
+def validate_local_region_cdkn1a(tf_embedding):
+    # cdkn1a
+    chr_name= 'chr6'
+    tss = 36676460 
+    radius = 1000
+    start = tss - radius
+    end = tss + radius
+    return validate_local_region(chr_name, start, end, radius, tf_embedding)[0]
+
 
 def validate_local_region_mdm2(tf_embedding):
     # MDM2
@@ -308,28 +329,8 @@ with demo:
         """)
     
         amino_acid_text = gr.Textbox(label = 'Amino Acid Sequence', lines = 5, placeholder = 'GRGRHPGKGVK...')
-        gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRK', # TP53
-                    'GRGRHPGKGVKSPGEKSRYETSLNLTTKRFLELLSHSADGVVDLNWAAEVLKVQKRRIYDITNVLEGIQLIAKKSKNHIQWLGS'], inputs=amino_acid_text)
+        gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRK' ], inputs=amino_acid_text)# TP53
 
-        amino_acid_mut_text = gr.Textbox(label = 'Amino Acid Sequence', lines = 5, placeholder = 'GRGRHPGKGVK...')
-        gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVIVCACPGRDRRTEEENLRK', # TP53 Mut R273I
-                    'TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVKVCACPGRDRRTEEENLRK', # TP53 Mut R273K
-                    ], inputs=amino_acid_mut_text)
-
-        gr.Markdown(
-        """
-        ## DNA/RNA
-        In the below sections, you can also input your own sequences to cater the analysis to your specific needs in the FASTA format.  The default DNA input sequences are some cell cycle related genes (such as MDM2, BAX2). 
-        """)
-
-        CHOICE = gr.Radio(
-            ["DNA", "RNA"], label="Essay Length to Write?"
-        )
-
-        dna_seq_text = gr.Textbox(lines=2, interactive=True)
-        model_choice = gr.State([])
-        CHOICE.change(fn=change_model, inputs=CHOICE, outputs=[dna_seq_text,model_choice])
-        gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
     
 
         gr.Markdown(
@@ -341,22 +342,35 @@ with demo:
         tf_embedding_target = gr.State([])
         button = gr.Button('Visualize Amino Acid Embedding')
         button.click(esm_visulization, inputs = [amino_acid_text], outputs = [aa_plot, tf_embedding_target])
+
+        gr.Markdown(
+        """
+        ## DNA/RNA
+        In the below sections, you can also input your own sequences to cater the analysis to your specific needs in the FASTA format.  The default DNA input sequences are some cell cycle related genes (such as MDM2, BAX2). 
+        """)
+
+        CHOICE = gr.Radio(
+            ["DNA", "RNA"], label="Input DNA or RNA", default="DNA"
+        )
+
+        dna_seq_text = gr.Textbox(lines=2, interactive=True)
+        model_choice = gr.State([])
+        CHOICE.change(fn=change_model, inputs=CHOICE, outputs=[dna_seq_text,model_choice])
+        gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
+    
+
         gr.Markdown(
         """
         # Crosslink Prediction
         ## Binding affinity prediction
         """)
-        output = gr.Label(label = 'Binding Affinity Prediction, log (x + 1) scaled')
+        output = gr.Label(label = 'Binding Affinity Prediction, 0: low binding affinity, 10: high binding affinity')
         onehot_seq = gr.State([])
         tf_embedding = gr.State([])
         mut_tf_embedding = gr.State([])
     
         button = gr.Button('Predict')
         button.click(predict, inputs = [amino_acid_text, dna_seq_text, model_choice], outputs = [output, onehot_seq, tf_embedding])
-
-        mutation_label = gr.Label(label = 'Mutation Sequence Processed')
-        button = gr.Button('Process Mutation')
-        button.click(amino_acid_mut_encode, inputs = [amino_acid_mut_text], outputs = [mut_tf_embedding, mutation_label])
 
         gr.Markdown(
         """
@@ -365,46 +379,43 @@ with demo:
         tf_comparison_plot = gr.Plot()
         botton = gr.Button('Compare with other TFs')
         botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = [tf_comparison_plot])
+        
+        
         gr.Markdown(
         """
-        ## Promoter binding difference between wild type and mutant of protein
+        ## Comparison with mutated NBPs
+        """)
+
+        amino_acid_mut_text = gr.Textbox(label = 'Amino Acid Sequence', lines = 5, placeholder = 'GRGRHPGKGVK...')
+        gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVHVCACPGRDRRTEEENLRK', # TP53 Mut R273I
+                    'WGNLSYADLITKAIESSAEKRLTLSQIYEWMVKSVPYFKDKGDSNSSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKK', # foxo1和tp53
+                    ], inputs=amino_acid_mut_text)
+      #  mutation_label = gr.Label(label = 'Mutation Sequence Processed')
+        mutation_label = gr.State([])
+        button = gr.Button('Process Mutation')
+        button.click(amino_acid_mut_encode, inputs = [amino_acid_mut_text], outputs = [mut_tf_embedding, mutation_label])
+
+    
+        gr.Markdown(
+        """
+        # Promoter binding difference between wild type and mutant of protein
         """)
         gr.Markdown(
         """
-        # MDM2 promoter 
+        ## CDKN1A promoter， 
+        CDKN1A is a gene that encodes a potent cyclin-dependent kinase inhibitor. The encoded protein binds to and inhibits the activity of cyclin-cyclin-dependent kinase2 or -cyclin-dependent kinase4 complexes, and thus functions as a regulator of cell cycle progression at G1.
         """)
-        mdm2_plot = gr.Plot()
-        mdm2_button = gr.Button('Generate binding profile for MDM2 promoter')
-        mdm2_button.click(validate_local_region_mdm2, inputs = [tf_embedding], outputs = mdm2_plot)
 
         mdm2_plot_wt = gr.Plot()
         mdm2_plot_mut = gr.Plot()
         mdm2_plot_diff = gr.Plot()
-        mdm2_mut_button = gr.Button('Compare mutated on MDM2 promoter region')
-        mdm2_mut_button.click(compare_wt_mut_tf_mdm2, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
+        mdm2_mut_button = gr.Button('Compare mutated on CDKN1A promoter region')
+        mdm2_mut_button.click(compare_wt_mut_tf_cdkn1a, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
         gr.Markdown(
         """
-        # BAX promoter 
-        """)
-        bax_plot = gr.Plot()
-        bax_button = gr.Button('Generate binding profile for BAX promoter')
-        bax_button.click(validate_local_region_bax, inputs = [tf_embedding], outputs = bax_plot)
-
-        bax_plot_wt = gr.Plot()
-        bax_plot_mut = gr.Plot()
-        bax_plot_diff = gr.Plot()
-        bax_mut_button = gr.Button('Compare mutated on BAX promoter region')
-        bax_mut_button.click(compare_wt_mut_tf_bax, inputs = [tf_embedding, mut_tf_embedding], outputs = [bax_plot_wt, bax_plot_mut, bax_plot_diff])
-
-
-        gr.Markdown(
-        """
-        # KMT2A promoter
+        ## KMT2A promoter
         KMT2A is a gene that encodes a histone methyltransferase. KMT2A is most notorious for its role in acute leukemia. Mutations and changes in its expression have also been found in solid tumors, such as lung, colorectal, and gastric cancers.
         """)
-        kmt2a_plot = gr.Plot()
-        kmt2a_button = gr.Button('Generate binding profile for KMT2A promoter')
-        kmt2a_button.click(validate_local_region_kmt2a, inputs = [tf_embedding], outputs = kmt2a_plot)
 
         kmt2a_plot_wt = gr.Plot()
         kmt2a_plot_mut = gr.Plot()
