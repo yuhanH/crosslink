@@ -2,7 +2,7 @@ import gradio as gr
 import plotly.graph_objects as go
 import pymde
 import esm
- 
+import json
 import torch
 
 import sys
