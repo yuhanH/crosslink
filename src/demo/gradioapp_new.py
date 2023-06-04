@@ -5,8 +5,9 @@ import esm
 import json
 import torch
 import sys
+import numpy as np
 sys.path.append('../model')
-from model import TFBindingCrossAttentionModel
+from model import TFBindingCrossAttentionModel, TFBindingModel
 from dataset import TFBindingDataset
 torch.cuda.empty_cache()
 
@@ -24,9 +25,14 @@ def load_esm_model():
 class Args:
     def __init__(self, joint_cross_attn_depth):
         self.joint_cross_attn_depth = joint_cross_attn_depth
+
 def load_model(mode = 'DNA'):
     print(f'Loading {mode} Binding model...')
-    model = TFBindingCrossAttentionModel(Args(joint_cross_attn_depth=1))
+    if mode == 'DNA':
+      model = TFBindingCrossAttentionModel(Args(joint_cross_attn_depth=1))
+    elif mode == 'RNA':
+        model = TFBindingModel()
+
     model.load_state_dict(torch.load(model_path[mode]))
     model.eval()
     model.cuda()
@@ -109,7 +115,10 @@ def predict(amino_acid_seq, dna_seq, mode = 'DNA'):
     onehot_seq = dna_seq_encode(dna_seq)
 
     pred = model_inference(tf_embedding, onehot_seq)
+    if mode == 'RNA':
+        pred = float(np.mean(pred)) 
     pred = float(pred)
+    
     return pred, onehot_seq, tf_embedding
 
 def model_inference(tf_embedding, dna_sequence_onehot):
@@ -306,7 +315,6 @@ with demo:
 
         gr.Markdown(
         """
-        # Data input
         ## DNA/RNA
         In the below sections, you can also input your own sequences to cater the analysis to your specific needs in the FASTA format.  The default DNA input sequences are some cell cycle related genes (such as MDM2, BAX2). 
         """)

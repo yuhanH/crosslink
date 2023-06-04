@@ -92,7 +92,7 @@ class TFBindingModel(nn.Module):
     def forward(self, seq, esm_emb):
         seq_emb = self.seq_encoder(seq)
         esm_emb = self.esm_encoder(esm_emb)
-        combined = torch.cat((seq_emb, esm_emb), dim = 1)
+        combined = torch.cat((seq_emb.squeeze(0), esm_emb.squeeze(0)), dim = 1)
         out = self.header(combined)
         return out
     
