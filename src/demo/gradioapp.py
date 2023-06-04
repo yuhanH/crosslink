@@ -28,10 +28,10 @@ class Args:
 
 def load_model(mode = 'DNA'):
     print(f'Loading {mode} Binding model...')
-    if mode == 'DNA':
-      model = TFBindingCrossAttentionModel(Args(joint_cross_attn_depth=1))
-    elif mode == 'RNA':
-        model = TFBindingModel()
+    if mode == 'RNA':
+      model = TFBindingModel() 
+    else:
+        model = TFBindingCrossAttentionModel(Args(joint_cross_attn_depth=1))
 
     model.load_state_dict(torch.load(model_path[mode]))
     model.eval()
@@ -279,7 +279,7 @@ def change_model(choice = "DNA"):
 # Analysis
 
 esm_model, batch_converter, alphabet = load_esm_model()
-model = None
+model = load_model('DNA')
 dataset = TFBindingDataset()
 demo = gr.Blocks()
 
@@ -350,11 +350,11 @@ with demo:
         """)
 
         CHOICE = gr.Radio(
-            ["DNA", "RNA"], label="Input DNA or RNA", default="DNA"
+            ["DNA", "RNA"], label="Input DNA or RNA", value="DNA"
         )
 
         dna_seq_text = gr.Textbox(lines=2, interactive=True)
-        model_choice = gr.State([])
+        model_choice = gr.State(value = 'DNA')
         CHOICE.change(fn=change_model, inputs=CHOICE, outputs=[dna_seq_text,model_choice])
         gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
     
@@ -402,7 +402,7 @@ with demo:
         """)
         gr.Markdown(
         """
-        ## CDKN1A promoter， 
+        ## CDKN1A promoter 
         CDKN1A is a gene that encodes a potent cyclin-dependent kinase inhibitor. The encoded protein binds to and inhibits the activity of cyclin-cyclin-dependent kinase2 or -cyclin-dependent kinase4 complexes, and thus functions as a regulator of cell cycle progression at G1.
         """)
 
