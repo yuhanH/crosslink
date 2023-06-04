@@ -3,6 +3,9 @@ import torch.nn as nn
 import numpy as np
 import copy
 
+from attention import JointCrossAttentionBlock
+
+
 class ConvBlock(nn.Module):
     def __init__(self, size, stride = 2, hidden_in = 64, hidden = 64):
         super(ConvBlock, self).__init__()
@@ -45,9 +48,9 @@ class ESMEncoder(nn.Module):
     def forward(self, x):
         x = self.conv_start(x)
         x = self.res_blocks(x)
-        out = self.conv_end(x)
-        out_mean = torch.mean(out, dim = 2)
-        return out_mean
+        out = self.conv_end(x).permute(0,2,1)
+        # out_mean = torch.mean(out, dim = 2)
+        return out
 
     def get_res_blocks(self, n, his, hs):
         blocks = []
@@ -89,6 +92,50 @@ class TFBindingModel(nn.Module):
     def forward(self, seq, esm_emb):
         seq_emb = self.seq_encoder(seq)
         esm_emb = self.esm_encoder(esm_emb)
+        combined = torch.cat((seq_emb, esm_emb), dim = 1)
+        out = self.header(combined)
+        return out
+    
+
+class TFBindingCrossAttentionModel(nn.Module):
+
+    def __init__(self, args):
+        super(TFBindingCrossAttentionModel, self).__init__()
+        self.seq_encoder = SeqEncoder(5)
+        self.esm_encoder = ESMEncoder(2560)
+
+        # joint cross attn
+        joint_cross_attn_depth = args.joint_cross_attn_depth
+        self.joint_cross_attns = nn.ModuleList([])
+        for _ in range(joint_cross_attn_depth):
+            attn = JointCrossAttentionBlock(
+                dim = 512,
+                context_dim = 512,
+                dropout = 0.5
+            )
+            self.joint_cross_attns.append(attn)
+
+        self.header = nn.Sequential(
+                nn.Linear(512 + 512, 512),
+                nn.Dropout(0.5),
+                nn.ReLU(),
+                nn.Linear(512, 256),
+                nn.Dropout(0.5),
+                nn.ReLU(),
+                nn.Linear(256, 1))
+
+    def forward(self, seq, esm_emb):
+        seq_emb = self.seq_encoder(seq)
+        esm_emb = self.esm_encoder(esm_emb)
+        # joint cross attention
+        for cross_attn in self.joint_cross_attns:
+            seq_emb, esm_emb = cross_attn(
+                seq_emb,
+                context = esm_emb,
+                context_mask = None
+            )
+        seq_emb = torch.mean(seq_emb, dim = 1)
+        esm_emb = torch.mean(esm_emb, dim = 1)
         combined = torch.cat((seq_emb, esm_emb), dim = 1)
         out = self.header(combined)
         return out

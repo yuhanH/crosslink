@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 from dataset import TFBindingDataset
-from model import TFBindingModel
+from model import TFBindingModel, TFBindingCrossAttentionModel
 from scipy.stats import spearmanr, pearsonr
 from tqdm import tqdm
 from datetime import datetime
@@ -21,7 +21,13 @@ def main():
     parser.add_argument('--run_dir', type=str, default='/home/ubuntu/codebase/tf_binding/runs/')
     parser.add_argument('--epoches', type=int, default=200)
     parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--model_type", type=str, default='TFBinding')
+    parser.add_argument("--joint_cross_attn_depth", type=int, default=1)
+
     args = parser.parse_args()
+
+    # create dirs
+    os.makedirs(args.run_dir, exist_ok=True)
 
     # Initialize distributed training
     torch.cuda.set_device(args.local_rank)
@@ -39,8 +45,15 @@ def main():
     val_dataset = TFBindingDataset(mode='val', split=args.split)
     val_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, sampler=val_sampler, num_workers=10)
-    model = TFBindingModel().cuda()
+
+    if args.model_type == 'TFBinding':
+        model = TFBindingModel().cuda()
+    elif args.model_type == 'TFBindingCrossAttention':
+        model = TFBindingCrossAttentionModel(args).cuda()
+    else:
+        raise NotImplementedError
     model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank)
+    
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
