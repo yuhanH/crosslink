@@ -8,6 +8,7 @@ import sys
 sys.path.append('../model')
 from model import TFBindingModel
 from dataset import TFBindingDataset
+torch.cuda.empty_cache()
 
 data_dir = '/home/ubuntu/demo_session/demo_data/'
 model_path = '/home/ubuntu/demo_session/demo_data/model_9.pt'
@@ -229,6 +230,14 @@ def validate_local_region_kmt2a(tf_embedding):
     end = tss + radius
     return validate_local_region(chr_name, start, end, radius, tf_embedding)[0]
 
+def change_model(choice = "DNA"):
+    if choice == "RNA":
+        return gr.update(lines=5, visible=True, label="RNA input sequences: ", placeholder = 'ccggatggtgcact...')
+    else:
+        return gr.update(lines=5, visible=True, label="DNA input sequences: ", placeholder = 'gcaggggggcactc...')
+
+
+
 # Analysis
 
 esm_model, batch_converter, alphabet = load_esm_model()
@@ -266,9 +275,15 @@ with demo:
    In the below sections, you can also input your own sequences to cater the analysis to your specific needs in the FASTA format.  The default DNA input sequences are some cell cycle related genes (such as MDM2, BAX2). 
     """)
 
-    dna_seq_text = gr.Textbox(label = 'DNA Sequence', lines = 5, placeholder = 'gcaggggggcactc...')
+    CHOICE = gr.Radio(
+        ["DNA", "RNA"], label="Essay Length to Write?"
+    )
+
+    dna_seq_text = gr.Textbox(lines=2, interactive=True)
+    CHOICE.change(fn=change_model, inputs=CHOICE, outputs=dna_seq_text)
     gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
     
+
     gr.Markdown(
     """
     ## ESM2 visualization of your input proteins and our pretrained proteins
@@ -294,7 +309,7 @@ with demo:
     mutation_label = gr.Label(label = 'Mutation Sequence Processed')
     button = gr.Button('Process Mutation')
     button.click(amino_acid_mut_encode, inputs = [amino_acid_mut_text], outputs = [mut_tf_embedding, mutation_label])
-gr.Markdown(
+    gr.Markdown(
     """
     ## Comparison with other TFs binding affinity
     """)
