@@ -1,6 +1,8 @@
 import gradio as gr
 import plotly.graph_objects as go
-
+import pymde
+import esm
+ 
 import torch
 
 import sys
@@ -11,16 +13,13 @@ from dataset import TFBindingDataset
 # Load models
 def load_esm_model():
     print('Loading ESM model...')
-    import esm
-    model, alphabet = esm.pretrained.esm2_t36_3B_UR50D()
-    model.cuda()
+    esm_model, alphabet = esm.pretrained.esm2_t36_3B_UR50D()
+    esm_model.cuda()
     batch_converter = alphabet.get_batch_converter()
     print('Done.')
-    return model, batch_converter, alphabet
+    return esm_model, batch_converter, alphabet
 
-esm_model, batch_converter, alphabet = load_esm_model()
-
-def load_model(model_path = '../../runs/2023-05-30_17-24-51/models/model_9.pt'):
+def load_model(model_path = '/home/ubuntu/demo_session/demo_data/model_9.pt'):
     print('Loading TF Binding model...')
     model = TFBindingModel()
     model.load_state_dict(torch.load(model_path))
@@ -28,9 +27,6 @@ def load_model(model_path = '../../runs/2023-05-30_17-24-51/models/model_9.pt'):
     model.cuda()
     print('Done.')
     return model
-
-model = load_model()
-dataset = TFBindingDataset()
 
 # Raw Sequence Encoding
 def dna_seq_encode(seq):
@@ -43,13 +39,13 @@ def dna_seq_encode(seq):
     return seq_tensor
 
 def amino_acid_encode(amino_acid_seq):
+    global esm_model, batch_converter, alphabet
+
     data = [['input_name', amino_acid_seq]]
-    batch_labels, batch_strs, batch_tokens = batch_converter(data)
-    batch_tokens = batch_tokens.to('cuda')
-    batch_lens = (batch_tokens != alphabet.padding_idx).sum(1)
+    _, _, batch_tokens = batch_converter(data)
 
     with torch.no_grad():
-        results = esm_model(batch_tokens, repr_layers=[36], return_contacts=True)
+        results = esm_model(batch_tokens.cuda(), repr_layers=[36], return_contacts=True)
     token_embedding = results["representations"][36][0]
 
     embedding = torch.transpose(token_embedding, 0, 1)
@@ -61,9 +57,43 @@ def amino_acid_encode(amino_acid_seq):
     cropped_embedding = padded_embedding[:, 100:200]
     return cropped_embedding
 
+
 def amino_acid_mut_encode(amino_acid_seq):
     return amino_acid_encode(amino_acid_seq), amino_acid_seq
 
+def esm_atlas(query_embedding):
+    ref_embedding = torch.load('/home/ubuntu/demo_session/demo_data/all_protein_esm_matrix.pt').cuda()
+    query_embedding = query_embedding.mean(1).view(1, -1)
+    ref_query_emb = torch.cat((ref_embedding, query_embedding), dim=0)
+    with open('/home/ubuntu/demo_session/demo_data/all_protein_metadata.json', 'r') as file:
+        ref_meta = json.load(file)
+    meta_data = ref_meta + [{'label': 'query'}]
+    mde_emb = pymde.preserve_neighbors(ref_query_emb, embedding_dim=2, verbose=True, device="cuda", repulsive_fraction = 1.2).embed()
+    mde_emb = mde_emb.detach().cpu().numpy()
+    labels = [x['label'] for x in meta_data]
+    colors = ['lightgrey'] * ref_embedding.shape[0] + ['red']
+
+    scatter = go.Scatter(
+    x=mde_emb[:, 0], 
+    y=mde_emb[:, 1], 
+    mode='markers',
+    marker=dict(
+        size=10,
+        color=colors, #set color equal to a variable
+    ),
+    text=labels # set hover text
+        )
+    fig = go.Figure(data=scatter)
+    fig.update_layout(title_text='Protein ESM visualization')
+    
+    return fig
+
+def esm_visulization(amino_acid_seq):
+    query_emb = amino_acid_encode( amino_acid_seq)
+    fig = esm_atlas(query_emb)
+    return fig, query_emb
+
+  
 # Prediction
 def predict(amino_acid_seq, dna_seq):
     tf_embedding = amino_acid_encode(amino_acid_seq)
@@ -85,7 +115,8 @@ def model_inference(tf_embedding, dna_sequence_onehot):
 def tf_comparison(dna_seq, current_pred):
     # Load tf embeddings ESR1, ERF, FOXP1, POU3F2
     tf_list = ['Current TF', 'ESR1', 'ERF', 'FOXP1', 'POU3F2']
-    tf_root_path = '/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B'
+    tf_root_path = '/home/ubuntu/demo_session/demo_data/factor_DNA_binding_emb_esm2_t36_3B'
+    
     onehot_seq = dna_seq_encode(dna_seq)
     pred_list = [current_pred['label']]
     for tf in tf_list:
@@ -101,7 +132,7 @@ def tf_comparison(dna_seq, current_pred):
     return fig
 
 def load_chr(chr_name):
-    chr_path = f'/home/ubuntu/codebase/tf_binding/data/hg38/dna_sequence/{chr_name}.fa.gz'
+    chr_path = f'/home/ubuntu/demo_session/demo_data/dna_sequence/{chr_name}.fa.gz'
     print(f'Reading sequence: {chr_path}')
     import gzip
     with gzip.open(chr_path, 'r') as f:
@@ -109,6 +140,7 @@ def load_chr(chr_name):
     seq = seq[seq.find('\n'):]
     seq = seq.replace('\n', '').lower()
     return seq
+
 
 def compare_wt_mut_tf(chr_name, start, end, radius, wt_tf, mut_tf):
     fig_wt, pred_list_wt = validate_local_region(chr_name, start, end, radius, wt_tf)
@@ -197,6 +229,9 @@ def validate_local_region_kmt2a(tf_embedding):
 
 # Analysis
 
+esm_model, batch_converter, alphabet = load_esm_model()
+model = load_model()
+dataset = TFBindingDataset()
 demo = gr.Blocks()
 
 with demo:
@@ -211,6 +246,15 @@ with demo:
 
     dna_seq_text = gr.Textbox(label = 'DNA Sequence', lines = 5, placeholder = 'gcaggggggcactc...')
     gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
+
+    gr.Markdown(
+    """
+    ESM embedding of the amino acid sequence with our pretrained proteins
+    """)
+    aa_plot = gr.Plot()
+    tf_embedding_target = gr.State([])
+    button = gr.Button('Visualize Amino Acid Embedding')
+    button.click(esm_visulization, inputs = [amino_acid_text], outputs = [aa_plot, tf_embedding_target])
 
     output = gr.Label(label = 'Binding Affinity Prediction, log (x + 1) scaled')
     onehot_seq = gr.State([])
