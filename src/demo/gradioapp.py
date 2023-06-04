@@ -18,7 +18,7 @@ def load_esm_model():
     print('Done.')
     return model, batch_converter, alphabet
 
-#esm_model, batch_converter, alphabet = load_esm_model()
+esm_model, batch_converter, alphabet = load_esm_model()
 
 def load_model(model_path = '../../runs/2023-05-30_17-24-51/models/model_9.pt'):
     print('Loading TF Binding model...')
@@ -33,7 +33,7 @@ model = load_model()
 dataset = TFBindingDataset()
 
 # Raw Sequence Encoding
-def dna_seq_encode(seq = 'agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'):
+def dna_seq_encode(seq):
     import numpy as np
     seq_dict = {'a': 0, 'c': 1, 'g': 2, 't': 3, 'n': 4}
     seq_onehot = np.zeros((5, len(seq)))
@@ -42,7 +42,7 @@ def dna_seq_encode(seq = 'agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcc
     seq_tensor = torch.tensor(seq_onehot)
     return seq_tensor
 
-def amino_acid_encode(amino_acid_seq = 'GRGRHPGKGVKSPGEKSRYETSLNLTTKRFLELLSHSADGVVDLNWAAEVLKVQKRRIYDITNVLEGIQLIAKKSKNHIQWLGS'):
+def amino_acid_encode(amino_acid_seq):
     data = [['input_name', amino_acid_seq]]
     batch_labels, batch_strs, batch_tokens = batch_converter(data)
     batch_tokens = batch_tokens.to('cuda')
@@ -61,11 +61,14 @@ def amino_acid_encode(amino_acid_seq = 'GRGRHPGKGVKSPGEKSRYETSLNLTTKRFLELLSHSADG
     cropped_embedding = padded_embedding[:, 100:200]
     return cropped_embedding
 
+def amino_acid_mut_encode(amino_acid_seq):
+    return amino_acid_encode(amino_acid_seq), amino_acid_seq
+
 # Prediction
 def predict(amino_acid_seq, dna_seq):
-    #tf_embedding = amino_acid_encode(amino_acid_seq)
+    tf_embedding = amino_acid_encode(amino_acid_seq)
     #torch.save(tf_embedding, 'tf_embedding.pt')
-    tf_embedding = torch.load('tf_embedding.pt')
+    #tf_embedding = torch.load('tf_embedding.pt')
     onehot_seq = dna_seq_encode(dna_seq)
 
     pred = model_inference(tf_embedding, onehot_seq)
@@ -107,7 +110,48 @@ def load_chr(chr_name):
     seq = seq.replace('\n', '').lower()
     return seq
 
-def validate_local_region(chr_name, start, end, radius, tf_embedding):
+def compare_wt_mut_tf(chr_name, start, end, radius, wt_tf, mut_tf):
+    fig_wt, pred_list_wt = validate_local_region(chr_name, start, end, radius, wt_tf)
+    fig_mut, pred_list_mut = validate_local_region(chr_name, start, end, radius, mut_tf, tf_type = 'Mutated')
+
+    # Plot difference
+    window_size = 100
+    step_size = 20
+    import numpy as np
+    pred_diff = np.array(pred_list_mut) - np.array(pred_list_wt)
+    fig_diff = go.Figure(data=[go.Bar(x=[l - radius for l in list(range(0, len(pred_diff) * step_size, step_size))], y=pred_diff)])
+    fig_diff.update_layout(title_text='TF Binding Prediction Difference', xaxis_title='Position to Promoter (bp)', yaxis_title='Predicted Binding Difference')
+    #fig_diff.update_yaxes(range=[-1, 1])
+    return fig_wt, fig_mut, fig_diff
+
+def compare_wt_mut_tf_mdm2(wt_tf, mut_tf):
+    # MDM2
+    chr_name= 'chr12'
+    tss = 68807024 
+    radius = 1000
+    start = tss - radius
+    end = tss + radius
+    return compare_wt_mut_tf(chr_name, start, end, radius, wt_tf, mut_tf)
+
+def compare_wt_mut_tf_bax(wt_tf, mut_tf):
+    # BAX
+    chr_name= 'chr19'
+    tss = 48954932
+    radius = 1000
+    start = tss - radius
+    end = tss + radius
+    return compare_wt_mut_tf(chr_name, start, end, radius, wt_tf, mut_tf)
+
+def compare_wt_mut_tf_kmt2a(wt_tf, mut_tf):
+    # KMT2A
+    chr_name= 'chr11'
+    tss = 118436755
+    radius = 1000
+    start = tss - radius
+    end = tss + radius
+    return compare_wt_mut_tf(chr_name, start, end, radius, wt_tf, mut_tf)
+
+def validate_local_region(chr_name, start, end, radius, tf_embedding, tf_type = 'Wild Type'):
     root_sequence_path = '/home/ubuntu/codebase/tf_binding/data/hg38/dna_sequence'
     dna_seq = load_chr(chr_name)[start:end]
     window_size = 100
@@ -120,9 +164,9 @@ def validate_local_region(chr_name, start, end, radius, tf_embedding):
 
     # Plotly bar chart
     fig = go.Figure(data=[go.Bar(x=[l - radius for l in list(range(0, len(dna_seq) - window_size, step_size))], y=pred_list)])
-    fig.update_layout(title_text='TF Binding Prediction', xaxis_title='Position to Promoter (bp)', yaxis_title='Predicted Binding, log (x + 1) scaled')
+    fig.update_layout(title_text=f'TF Binding Prediction ({tf_type})', xaxis_title='Position to Promoter (bp)', yaxis_title='Predicted Binding, log (x + 1) scaled')
     fig.update_yaxes(range=[0, 7])
-    return fig
+    return fig, pred_list
 
 def validate_local_region_mdm2(tf_embedding):
     # MDM2
@@ -131,16 +175,25 @@ def validate_local_region_mdm2(tf_embedding):
     radius = 1000
     start = tss - radius
     end = tss + radius
-    return validate_local_region(chr_name, start, end, radius, tf_embedding)
+    return validate_local_region(chr_name, start, end, radius, tf_embedding)[0]
 
 def validate_local_region_bax(tf_embedding):
-    # MDM2
+    # BAX
     chr_name= 'chr19'
     tss = 48954932
     radius = 1000
     start = tss - radius
     end = tss + radius
-    return validate_local_region(chr_name, start, end, radius, tf_embedding)
+    return validate_local_region(chr_name, start, end, radius, tf_embedding)[0]
+
+def validate_local_region_kmt2a(tf_embedding):
+    # KMT2A
+    chr_name= 'chr11'
+    tss = 118436755
+    radius = 1000
+    start = tss - radius
+    end = tss + radius
+    return validate_local_region(chr_name, start, end, radius, tf_embedding)[0]
 
 # Analysis
 
@@ -148,30 +201,66 @@ demo = gr.Blocks()
 
 with demo:
     amino_acid_text = gr.Textbox(label = 'Amino Acid Sequence', lines = 5, placeholder = 'GRGRHPGKGVK...')
-    gr.Examples(['GRGRHPGKGVKSPGEKSRYETSLNLTTKRFLELLSHSADGVVDLNWAAEVLKVQKRRIYDITNVLEGIQLIAKKSKNHIQWLGS'], inputs=amino_acid_text)
+    gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRK', # TP53
+                'GRGRHPGKGVKSPGEKSRYETSLNLTTKRFLELLSHSADGVVDLNWAAEVLKVQKRRIYDITNVLEGIQLIAKKSKNHIQWLGS'], inputs=amino_acid_text)
+
+    amino_acid_mut_text = gr.Textbox(label = 'Amino Acid Sequence', lines = 5, placeholder = 'GRGRHPGKGVK...')
+    gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVIVCACPGRDRRTEEENLRK', # TP53 Mut R273I
+                 'TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVKVCACPGRDRRTEEENLRK', # TP53 Mut R273K
+                 ], inputs=amino_acid_mut_text)
+
     dna_seq_text = gr.Textbox(label = 'DNA Sequence', lines = 5, placeholder = 'gcaggggggcactc...')
     gr.Examples(['agagggcggagcactcccgtgccccggggcaggagtgcagggagctcccgcgcccggaacgttgcgagcaaggcttgcgagcgtcgcaggggggcactcg'], inputs=dna_seq_text)
-    #amino_acid_embedding_plot = gr.Plot()
 
     output = gr.Label(label = 'Binding Affinity Prediction, log (x + 1) scaled')
     onehot_seq = gr.State([])
     tf_embedding = gr.State([])
+    mut_tf_embedding = gr.State([])
 
     button = gr.Button('Predict')
     button.click(predict, inputs = [amino_acid_text, dna_seq_text], outputs = [output, onehot_seq, tf_embedding])
 
+    mutation_label = gr.Label(label = 'Mutation Sequence Processed')
+    button = gr.Button('Process Mutation')
+    button.click(amino_acid_mut_encode, inputs = [amino_acid_mut_text], outputs = [mut_tf_embedding, mutation_label])
+
     tf_comparison_plot = gr.Plot()
     botton = gr.Button('Compare with other TFs')
-    botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = tf_comparison_plot)
+    botton.click(tf_comparison, inputs = [dna_seq_text, output], outputs = [tf_comparison_plot])
 
+    # mdm2
     mdm2_plot = gr.Plot()
     mdm2_button = gr.Button('Generate binding profile for MDM2 promoter')
     mdm2_button.click(validate_local_region_mdm2, inputs = [tf_embedding], outputs = mdm2_plot)
 
+    mdm2_plot_wt = gr.Plot()
+    mdm2_plot_mut = gr.Plot()
+    mdm2_plot_diff = gr.Plot()
+    mdm2_mut_button = gr.Button('Compare mutated on MDM2 promoter region')
+    mdm2_mut_button.click(compare_wt_mut_tf_mdm2, inputs = [tf_embedding, mut_tf_embedding], outputs = [mdm2_plot_wt, mdm2_plot_mut, mdm2_plot_diff])
+
+    # bax
     bax_plot = gr.Plot()
     bax_button = gr.Button('Generate binding profile for BAX promoter')
     bax_button.click(validate_local_region_bax, inputs = [tf_embedding], outputs = bax_plot)
 
+    bax_plot_wt = gr.Plot()
+    bax_plot_mut = gr.Plot()
+    bax_plot_diff = gr.Plot()
+    bax_mut_button = gr.Button('Compare mutated on BAX promoter region')
+    bax_mut_button.click(compare_wt_mut_tf_bax, inputs = [tf_embedding, mut_tf_embedding], outputs = [bax_plot_wt, bax_plot_mut, bax_plot_diff])
+
+    # KMT2A
+    kmt2a_plot = gr.Plot()
+    kmt2a_button = gr.Button('Generate binding profile for KMT2A promoter')
+    kmt2a_button.click(validate_local_region_kmt2a, inputs = [tf_embedding], outputs = kmt2a_plot)
+
+    kmt2a_plot_wt = gr.Plot()
+    kmt2a_plot_mut = gr.Plot()
+    kmt2a_plot_diff = gr.Plot()
+    kmt2a_mut_button = gr.Button('Compare mutated on KMT2A promoter region')
+    kmt2a_mut_button.click(compare_wt_mut_tf_kmt2a, inputs = [tf_embedding, mut_tf_embedding], outputs = [kmt2a_plot_wt, kmt2a_plot_mut, kmt2a_plot_diff])
+
     #gr.Image(label = 'Relationship in Disease State')
 
-demo.launch()  
+demo.launch(share=True)  
