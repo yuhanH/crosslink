@@ -422,5 +422,12 @@ with demo:
         kmt2a_plot_diff = gr.Plot()
         kmt2a_mut_button = gr.Button('Compare mutated on KMT2A promoter region')
         kmt2a_mut_button.click(compare_wt_mut_tf_kmt2a, inputs = [tf_embedding, mut_tf_embedding], outputs = [kmt2a_plot_wt, kmt2a_plot_mut, kmt2a_plot_diff])
+    with gr.Tab("Team"):
+        gr.Markdown(
+        """
+        ## Six people from six institutes
+        ![team](file/Team_photo.png)
+        """)
+
 
 demo.launch(share=True)  
