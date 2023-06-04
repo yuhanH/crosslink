@@ -66,6 +66,7 @@ def amino_acid_encode(amino_acid_seq):
     padded_embedding = torch.nn.functional.pad(embedding, (pad_margin_l, pad_margin_r), 'constant', 0)
     # Crop
     cropped_embedding = padded_embedding[:, 50:250]
+
     return cropped_embedding
 
 
@@ -110,6 +111,8 @@ def predict(amino_acid_seq, dna_seq, mode = 'DNA'):
     global model
     model = load_model(mode)
     tf_embedding = amino_acid_encode(amino_acid_seq)
+    if mode == 'RNA':
+        tf_embedding = tf_embedding[:, 0:100]
     #torch.save(tf_embedding, 'tf_embedding.pt')
     #tf_embedding = torch.load('tf_embedding.pt')
     onehot_seq = dna_seq_encode(dna_seq)
