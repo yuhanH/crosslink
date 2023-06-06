@@ -1,18 +1,23 @@
+from aifc import _aifc_params
 import gradio as gr
 import plotly.graph_objects as go
 import pymde
+import sys
+sys.path.append('/home/haoy/esm')
+
 import esm
 import json
 import torch
-import sys
+
 import numpy as np
 sys.path.append('../model')
+
 from model import TFBindingCrossAttentionModel, TFBindingModel
 from dataset import TFBindingDataset
 torch.cuda.empty_cache()
 
-data_dir = '/home/ubuntu/demo_session/demo_data/'
-model_path = {"DNA":'/home/ubuntu/demo_session/demo_data/cross_atten_model.pt', "RNA":'/home/ubuntu/demo_session/demo_data/rbp_model_10.pt'}
+data_dir = '/home/haoy/share/DL_project/TF_crosslink/demo_data/'
+model_path = {"DNA":f'{data_dir}/cross_atten_model.pt', "RNA":f'{data_dir}/rbp_model_10.pt'}
 
 # Load models
 def load_esm_model():

@@ -4,12 +4,15 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
-sys.path.append('/home/ubuntu/codebase/tf_binding/src/preprocessing/dna_seq/gen_training')
+
+data_dir = '/home/haoy/share/DL_project/TF_crosslink/demo_data/'
+
+sys.path.append(data_dir + '/tf_binding/src/preprocessing/dna_seq/gen_training')
 
 class TFBindingDataset(Dataset):
 
     def __init__(self, mode = 'train', split = 'random',transform=None):
-        self.data_path = '/home/ubuntu/codebase/tf_binding/data/hg38/tf_seq_data_all_tf_200bp/'
+        self.data_path = data_dir + '/tf_binding/data/hg38/tf_seq_data_all_tf_200bp/'
         self.tf_names = self.get_all_tf_names()
         self.transform = transform
         self.tf_embeddings = self.get_tf_embeddings()
@@ -44,7 +47,7 @@ class TFBindingDataset(Dataset):
         return onehot_seq, tf_embedding, label
 
     def get_tf_embeddings(self):
-        tf_embedding_path = '/home/ubuntu/protein_embeddings/all_tf_emb_esm2_t36_3B'
+        tf_embedding_path = data_dir + '/all_tf_emb_esm2_t36_3B'
         model_id = 36
         tf_embeddings = {}
         for tf_name in self.tf_names:
@@ -93,7 +96,7 @@ class TFBindingDataset(Dataset):
         
     def data_split_by_tf_and_chr(self, data, mode, val_chr=['chr4'], test_chr=['chr14'], val_cluster=[8], test_cluster=[9]):
         """return data index for train, val, test set split by TF cluster"""
-        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        tf_cluster = pd.read_csv(data_dir + '/all_tf_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
         train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf'].values
         val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf'].values
         test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf'].values
@@ -111,7 +114,7 @@ class TFBindingDataset(Dataset):
         
     def data_split_by_tf_cluster(self, data, mode, val_cluster=[8], test_cluster=[9]):
         """return data index for train, val, test set split by TF cluster"""
-        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        tf_cluster = pd.read_csv(data_dir + '/all_tf_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
         train_tfs = tf_cluster[~tf_cluster['cluster'].isin(val_cluster + test_cluster)]['tf'].values
         val_tfs = tf_cluster[tf_cluster['cluster'].isin(val_cluster)]['tf'].values
         test_tfs = tf_cluster[tf_cluster['cluster'].isin(test_cluster)]['tf'].values
@@ -129,7 +132,7 @@ class TFBindingDataset(Dataset):
     
     def data_split_by_tf_in_domain(self, data, mode, val_num=1, test_num=1):
         """return data index for train, val, test set split by tf_name. Leave 1 TFs in each TF cluster for validation and same for test set, respectively"""
-        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        tf_cluster = pd.read_csv(data_dir + '/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
         # first tf in each cluster is used for validation, last tf in each cluster is used for test
         val_tfs = tf_cluster.groupby('cluster').head(val_num)['tf'].values
         test_tfs = tf_cluster.groupby('cluster').tail(test_num)['tf'].values
@@ -148,7 +151,7 @@ class TFBindingDataset(Dataset):
         
     def data_split_by_tf_in_domain_and_chr(self, data, mode, val_num=1, test_num=1, val_chr=['chr4'], test_chr=['chr14']):
         """return data index for train, val, test set split by tf_name. Leave 1 TFs in each TF cluster for validation and same for test set, respectively"""
-        tf_cluster = pd.read_csv('/home/ubuntu/protein_embeddings/factor_DNA_binding_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
+        tf_cluster = pd.read_csv(data_dir + '/all_tf_emb_esm2_t36_3B/tf_cluster.kmeans10.csv')
         # first tf in each cluster is used for validation, last tf in each cluster is used for test
         val_tfs = tf_cluster.groupby('cluster').head(val_num)['tf'].values
         test_tfs = tf_cluster.groupby('cluster').tail(test_num)['tf'].values
