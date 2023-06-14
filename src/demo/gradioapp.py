@@ -11,13 +11,14 @@ import torch
 
 import numpy as np
 sys.path.append('../model')
-
 from model import TFBindingCrossAttentionModel, TFBindingModel
 from dataset import TFBindingDataset
 torch.cuda.empty_cache()
 
+
 data_dir = '/home/haoy/share/DL_project/TF_crosslink/demo_data/'
 model_path = {"DNA":f'{data_dir}/cross_atten_model.pt', "RNA":f'{data_dir}/rbp_model_10.pt'}
+
 
 # Load models
 def load_esm_model():
@@ -80,8 +81,8 @@ def amino_acid_mut_encode(amino_acid_seq):
 
 def esm_atlas(query_embedding):
     ref_embedding = torch.load(data_dir + '/all_protein_esm_matrix.pt').cuda()
-    query_embedding = query_embedding.mean(1).view(1, -1)
-    ref_query_emb = torch.cat((ref_embedding, query_embedding), dim=0)
+    query_embedding_mean = query_embedding[:,  torch.abs(query_embedding.mean(0)) > 1e-6].mean(1).view(1, -1)
+    ref_query_emb = torch.cat((ref_embedding, query_embedding_mean), dim=0)
     with open(data_dir + '/all_protein_metadata.json', 'r') as file:
         ref_meta = json.load(file)
     meta_data = ref_meta + [{'label': 'query'}]
@@ -280,7 +281,6 @@ def change_model(choice = "DNA"):
         return gr.update(lines=5, visible=True, label="DNA input sequences: ", placeholder = 'gcaggggggcactc...'), choice
 
 
-
 # Analysis
 
 esm_model, batch_converter, alphabet = load_esm_model()
@@ -334,7 +334,7 @@ with demo:
         """)
     
         amino_acid_text = gr.Textbox(label = 'Amino Acid Sequence', lines = 5, placeholder = 'GRGRHPGKGVK...')
-        gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRK' ], inputs=amino_acid_text)# TP53
+        gr.Examples(['TYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRK','PPCEARECVNCGATATPLWRRDRTGHYLCNACGLYHKMNGQNRPLIRPKKRLIVSKRAGTQCTNCQTTTTTLWRRNASGDPVCNACGLYYKLHQVNRPLTMRKDGIQTRNRKASGK' ], inputs=amino_acid_text)# TP53
 
     
 
